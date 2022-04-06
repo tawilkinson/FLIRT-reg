@@ -1,0 +1,3 @@
+[submodule "gpuoptional"]
+	path = gpuoptional
+	url = https://github.com/CarlKCarlK/gpuoptional
