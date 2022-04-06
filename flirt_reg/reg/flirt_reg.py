@@ -7,9 +7,14 @@ import logging
 import os
 import subprocess
 import time
+import nibabel as nb
 import nipype.interfaces.fsl as fsl  # fsl
+import matplotlib.pyplot as plt
+from pygifsicle import optimize
+from matplotlib.animation import FuncAnimation, PillowWriter
 from flirt_reg.reg import omat
-from flirt_reg.utils import progress
+from flirt_reg.utils import progress, figstring
+
 
 
 def is_nii(path):
@@ -146,10 +151,13 @@ def run_flirt(
     xp = gpopt.array_module("cupy")
     omats = []
     original_omats = []
+    out_names = []
     # First entry is 'registered' to itself
     original_omats.append(xp.array([0, 0, 0, 0, 0, 0]))
     omats.append(xp.array([0, 0, 0, 0, 0, 0]))
     for data_directory in all_nii:
+        if not os.path.exists("{0}/tmp".format(data_directory)):
+            os.mkdir("{0}/tmp".format(data_directory))
         dir_len = len(all_nii[data_directory])
         if cur_dir == data_directory:
             start_idx = 1
@@ -170,12 +178,12 @@ def run_flirt(
                 btr.inputs.in_file = "{0}/{1}".format(
                     data_directory, all_nii[data_directory][i]
                 )
-                btr.inputs.out_file = "{0}/tmp.nii".format(data_directory)
+                btr.inputs.out_file = "{0}/tmp/tmp.nii".format(data_directory)
                 res = btr.run()
                 if res.runtime.returncode != 0:
                     print(
                         'Error in FSL bet command: \'{2}/bin/bet \
-                        "{0}/{1}" "{0}/tmp.nii"\', check there \
+                        "{0}/{1}" "{0}/tmp/tmp.nii"\', check there \
                         are no spaces in path'.format(
                             data_directory, all_nii[data_directory][i], fsl_dir
                         )
@@ -183,7 +191,7 @@ def run_flirt(
                     exit(0)
             else:
                 os.system(
-                    "cp {0}/{1} {0}/tmp.nii".format(
+                    "cp {0}/{1} {0}/tmp/tmp.nii".format(
                         data_directory, all_nii[data_directory][i]
                     )
                 )
@@ -195,13 +203,13 @@ def run_flirt(
                 uses_qform=True,
                 terminal_output="allatonce",
             )
-            flt.inputs.in_file = "{0}/tmp.nii".format(data_directory)
-            flt.inputs.reference = "{0}/ref.nii".format(cur_dir)
+            flt.inputs.in_file = "{0}/tmp/tmp.nii".format(data_directory)
+            flt.inputs.reference = "{0}/tmp/ref.nii".format(cur_dir)
             flt.inputs.output_type = "NIFTI_GZ"
-            flt.inputs.out_matrix_file = "{0}/tmp{1}.txt".format(
+            flt.inputs.out_matrix_file = "{0}/tmp/tmp{1}.txt".format(
                 data_directory, i
             )
-            flt.inputs.out_file = "{0}/reg{1}.nii.gz".format(data_directory, i)
+            flt.inputs.out_file = "{0}/tmp/reg{1}.nii.gz".format(data_directory, i)
             flt.inputs.searchr_x = [-90, 90]
             flt.inputs.searchr_y = [-90, 90]
             flt.inputs.searchr_z = [-90, 90]
@@ -215,10 +223,10 @@ def run_flirt(
             # out of FLIRT
             f = open("{0}/avs.txt".format(data_directory), "w")
             avscale = fsl.AvScale(all_param=True, terminal_output="allatonce")
-            avscale.inputs.mat_file = "{0}/tmp{1}.txt".format(
+            avscale.inputs.mat_file = "{0}/tmp/tmp{1}.txt".format(
                 data_directory, i
             )
-            avscale.inputs.ref_file = "{0}/reg{1}.nii.gz".format(
+            avscale.inputs.ref_file = "{0}/tmp/reg{1}.nii.gz".format(
                 data_directory, i
             )
             res = avscale.run()
@@ -230,16 +238,20 @@ def run_flirt(
                 cost_func=cost_func,
                 terminal_output="allatonce",
             )
-            flt.inputs.in_file = "{0}/reg{1}.nii.gz".format(data_directory, i)
-            flt.inputs.reference = "{0}/ref.nii".format(cur_dir)
+            flt.inputs.in_file = "{0}/tmp/reg{1}.nii.gz".format(data_directory, i)
+            flt.inputs.reference = "{0}/tmp/ref.nii".format(cur_dir)
             flt.inputs.output_type = "NIFTI_GZ"
             flt.inputs.schedule = "{0}/etc/flirtsch/measurecost1.sch".format(
                 fsl_dir
             )
-            flt.inputs.in_matrix_file = "{0}/tmp{1}.txt".format(
+            flt.inputs.in_matrix_file = "{0}/tmp/tmp{1}.txt".format(
                 data_directory, i
             )
-            flt.inputs.out_file = "{0}/reg{1}.nii.gz".format(data_directory, i)
+            flt.inputs.out_matrix_file = "{0}/tmp/reg{1}_flirt.mat".format(
+                data_directory, i
+            )
+            flt.inputs.out_file = "{0}/tmp/reg{1}.nii.gz".format(data_directory, i)
+            out_names.append(f"{data_directory}/tmp/reg{i}.nii.gz")
 
             res = flt.run()
             cost_str = str(res.runtime.stdout)
@@ -250,7 +262,7 @@ def run_flirt(
             try:
                 original_omats.append(omat.read_avs(avs_str, cost_val))
                 tmp_omat = omat.read_tmp_trans(
-                    "{0}/tmp{1}.txt".format(data_directory, i)
+                    "{0}/tmp/tmp{1}.txt".format(data_directory, i)
                 )
                 original_omats[-1][0] = tmp_omat[0][3]
                 original_omats[-1][1] = tmp_omat[1][3]
@@ -258,7 +270,7 @@ def run_flirt(
                 omats.append(original_omats[-1])
             except IndexError:
                 logging.debug(
-                    "{0}/tmp{1}.txt does not contain omat data".format(
+                    "{0}/tmp/tmp{1}.txt does not contain omat data".format(
                         data_directory, i
                     )
                 )
@@ -270,7 +282,7 @@ def run_flirt(
                 suffix="Complete",
                 length=50,
             )
-    return omats, original_omats
+    return omats, original_omats, out_names
 
 
 def flirt_reg(
@@ -326,9 +338,7 @@ def flirt_reg(
     else:
         cur_dir = os.getcwd()
         all_nii = {}
-        print(f"{data_dirs}")
         all_nii[data_dirs[0]] = get_nii(data_dirs[0], max_images)
-        print(f"{all_nii}")
         fname = os.path.join(data_dirs[0], all_nii[data_dirs[0]][0])
         n_nii = len(all_nii)
 
@@ -347,11 +357,11 @@ def flirt_reg(
 
     # Brain extract the reference image
     if extraction:
-        os.system("{}/bin/bet {} {}/ref.nii".format(fsl_dir, fname, cur_dir))
+        os.system("{}/bin/bet {} {}/tmp/ref.nii".format(fsl_dir, fname, cur_dir))
     else:
-        os.system("cp {} {}/ref.nii".format(fname, cur_dir))
+        os.system("cp {} {}/tmp/ref.nii".format(fname, cur_dir))
 
-    omats, original_omats = run_flirt(
+    omats, original_omats, out_paths = run_flirt(
         all_nii,
         cur_dir,
         fsl_dir,
@@ -374,12 +384,15 @@ def flirt_reg(
     else:
         # Save to out.nii
         logging.debug("Saving to {}".format("out.csv"))
-        omat.reg_to_csv(omats, os.path.join(data_dirs[0], "out.csv"))
+        if not os.path.exists(f"{data_dirs[0]}/results"):
+            os.mkdir(f"{data_dirs[0]}/results")
+        omat.reg_to_csv(omats, os.path.join(os.path.join(data_dirs[0], "results"), "out.csv"))
         omat.avs_to_csv(
-            original_omats, os.path.join(data_dirs[0], "original_out.csv")
-        )
+            original_omats, os.path.join(os.path.join(data_dirs[0], "results"), "original_out.csv"))
 
-        return omats
+    make_gif(out_paths,data_dirs[0])
+
+    return omats
 
 
 def apply_transform(
@@ -546,3 +559,81 @@ def apply_transform_cmd():
     if args.verbose:
         total_time = time.gmtime((time.time() - start_time))
         print(f"Pipeline complete in {time.strftime('%Hh%Mm%Ss', total_time)}")
+
+def get_gif_slices(image):
+    """Gets 3 orthogonal slices that show how good the registration is
+
+    Args:
+        image (nb.NiftiImage): the image to get slices from
+
+    Returns:
+        (np.array): the three slices
+    """
+    xp = gpopt.array_module("cupy")
+    array = image.get_fdata()
+    shape = xp.shape(array)
+    mid_x = int(xp.floor(shape[0] / 2))
+    mid_y = int(xp.floor(shape[1] / 2))
+    mid_z = int(xp.floor(shape[2] / 2))
+    slices = [
+        xp.flipud(array[mid_x, :, :]),
+        array[:, mid_y, :],
+        xp.rot90(array[:, :, mid_z]),
+    ]
+    return slices
+
+def make_gif(img_paths, out_path):
+
+    slices = []
+    for path in img_paths:
+        img = nb.load(path)
+        slices.append(get_gif_slices(img))
+
+
+    start_time = time.time()
+    if not os.path.exists(out_path + os.sep + "figures"):
+        os.makedirs(out_path + os.sep + "figures")
+    if not os.path.exists(out_path + os.sep + "tmp"):
+        os.makedirs(out_path + os.sep + "tmp")
+    gif_path = figstring.figstring("recon", path=out_path, ext="gif")
+    fig, axes = plt.subplots(1, 3)
+    # axes.axis("off")
+    axes = axes.ravel()
+    ims = []
+    im1 = axes[0].imshow(
+        slices[0][0],
+        cmap="gray",
+        aspect="auto",
+        interpolation="none",
+    )
+    axes[0].axis("off")
+    im2 = axes[1].imshow(
+        slices[0][1],
+        cmap="gray",
+        aspect="auto",
+        interpolation="none",
+    )
+    axes[1].axis("off")
+    im3 = axes[2].imshow(
+        slices[0][2],
+        cmap="gray",
+        aspect="auto",
+        interpolation="none",
+    )
+    axes[2].axis("off")
+    im = [im1, im2, im3]
+    ims.append(im)
+
+    def gif_update(slice):
+        im1.set_data(slice[0])
+        im2.set_data(slice[1])
+        im3.set_data(slice[2])
+        fig.canvas.draw_idle()
+        m = [im1, im2, im3]
+        return im
+
+    ani = FuncAnimation(fig, gif_update, frames=slices, blit=True)
+    ani.save(gif_path, writer=PillowWriter(fps=3))
+    optimize(gif_path)
+    total_time = time.gmtime((time.time() - start_time))
+    print(f"Gif generated in in {time.strftime('%Hh%Mm%Ss', total_time)}")
