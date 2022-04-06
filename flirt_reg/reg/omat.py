@@ -149,13 +149,11 @@ def get_reg_str(reg, rads=False):
     """
     Generates a display string for a single reg entry
     """
-    reg_str = "X: {} mm, Y: {} mm, Z: {} mm\n".format(reg[0], reg[1], reg[2])
+    reg_str = f"X: {reg[0]} mm, Y: {reg[1]} mm, Z: {reg[2]} mm\n"
     if rads:
-        reg_str += "RX: {} rad, RY: {} rad, RZ: {} rad".format(
-            reg[3], reg[4], reg[5]
-        )
+        reg_str += f"RX: {reg[3]} rad, RY: {reg[4]} rad, RZ: {reg[5]} rad"
     else:
-        reg_str += "RX: {}°, RY: {}°, RZ: {}°".format(reg[3], reg[4], reg[5])
+        reg_str += f"RX: {reg[3]}°, RY: {reg[4]}°, RZ: {reg[5]}°"
     return reg_str
 
 
@@ -290,7 +288,7 @@ def csv_to_reg(fname="out.csv"):
                 except IndexError:
                     print("Not a valid omat row, is this a valid file?")
     if len(omats) == 0:
-        print("!!! No omat rows found in {}. !!!\nExiting...".format(fname))
+        print(f"!!! No omat rows found in {fname}. !!!\nExiting...")
         exit(0)
 
     return omats

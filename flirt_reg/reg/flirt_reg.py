@@ -35,7 +35,7 @@ def get_nii(data_dir, max_images=None):
     Gets all .nii files in a given directory, can be limited using
     the max_images optional attribute
     """
-    print("Searching for data in: {}".format(data_dir))
+    print(f"Searching for data in: {data_dir}")
     all_files = [
         f
         for f in os.listdir(data_dir)
@@ -44,12 +44,12 @@ def get_nii(data_dir, max_images=None):
     all_nii = filter(is_nii, all_files)
     all_nii = list(all_nii)
     all_nii.sort()
-    logging.debug("{} files found".format(len(all_nii)))
+    logging.debug(f"{len(all_nii)} files found")
     if max_images and (len(all_nii) > max_images):
         all_nii = all_nii[0:max_images]
-        print("List of files truncated to {}".format(len(all_nii)))
+        print(f"List of files truncated to {len(all_nii)}")
     for file in all_nii:
-        logging.debug("Found file {}".format(file))
+        logging.debug(f"Found file {file}")
 
     return all_nii
 
@@ -68,11 +68,11 @@ def get_inputs(n_nii, input_schema):
 
 def make_coords(datadir, all_inputs, all_nii, fsl_dir, i):
     in_coords = []
-    with open("{0}".format(all_inputs[i]), "r") as file:
+    with open(f"{all_inputs[i]}", "r") as file:
         for line in file:
             line_in = line.strip("\n").split(" ")
             in_coords.append(line_in)
-    with open("{0}/tmp/coord_tmp{1}.txt".format(datadir, i), "w") as csvfile:
+    with open(f"{datadir}/tmp/coord_tmp{i}.txt", "w") as csvfile:
         regwriter = csv.writer(csvfile, delimiter=" ")
         regwriter.writerow(
             [
@@ -82,15 +82,15 @@ def make_coords(datadir, all_inputs, all_nii, fsl_dir, i):
             ]
         )
 
-    f = open("{0}/tmp/trans_tmp{1}.txt".format(datadir, i), "w")
+    f = open(f"{datadir}/tmp/trans_tmp{i}.txt", "w")
     subprocess.run(
         [
-            "{0}/bin/std2imgcoord".format(fsl_dir),
+            f"{fsl_dir}/bin/std2imgcoord",
             "-std",
-            "{0}/{1}".format(datadir, all_nii[datadir][0]),
+            f"{datadir}/{all_nii[datadir][0]}",
             "-img",
-            "{0}/{1}".format(datadir, all_nii[datadir][i]),
-            "{0}/tmp/coord_tmp{1}.txt".format(datadir, i),
+            f"{datadir}/{all_nii[datadir][i]}",
+            f"{datadir}/tmp/coord_tmp{i}.txt",
             "-vox",
         ],
         check=True,
@@ -98,10 +98,10 @@ def make_coords(datadir, all_inputs, all_nii, fsl_dir, i):
     )
 
     new_translations = []
-    with open("{0}/tmp/trans_tmp{1}.txt".format(datadir, i), "r") as file:
+    with open(f"{datadir}/tmp/trans_tmp{i}.txt", "r") as file:
         for line in file:
             new_translations = line.strip("\n").split("  ")
-    with open("{0}/tmp/trans_tmp{1}.txt".format(datadir, i), "w") as csvfile:
+    with open(f"{datadir}/tmp/trans_tmp{i}.txt", "w") as csvfile:
         regwriter = csv.writer(csvfile, delimiter=" ")
         regwriter.writerow(
             [
@@ -155,15 +155,15 @@ def run_flirt(
     original_omats.append(xp.array([0, 0, 0, 0, 0, 0]))
     omats.append(xp.array([0, 0, 0, 0, 0, 0]))
     for data_directory in all_nii:
-        if not os.path.exists("{0}/tmp".format(data_directory)):
-            os.mkdir("{0}/tmp".format(data_directory))
+        if not os.path.exists(f"{data_directory}/tmp"):
+            os.mkdir(f"{data_directory}/tmp")
         dir_len = len(all_nii[data_directory])
         if cur_dir == data_directory:
             start_idx = 1
         else:
             start_idx = 0
 
-        print("Running FLIRT on {}".format(data_directory))
+        print(f"Running FLIRT on {data_directory}")
         progress.printProgressBar(
             start_idx,
             dir_len,
@@ -174,25 +174,21 @@ def run_flirt(
         for i in range(start_idx, dir_len):
             if extraction:
                 btr = fsl.BET()
-                btr.inputs.in_file = "{0}/{1}".format(
-                    data_directory, all_nii[data_directory][i]
+                btr.inputs.in_file = (
+                    f"{data_directory}/{all_nii[data_directory][i]}"
                 )
-                btr.inputs.out_file = "{0}/tmp/tmp.nii".format(data_directory)
+                btr.inputs.out_file = f"{data_directory}/tmp/tmp.nii"
                 res = btr.run()
                 if res.runtime.returncode != 0:
                     print(
-                        'Error in FSL bet command: \'{2}/bin/bet \
-                        "{0}/{1}" "{0}/tmp/tmp.nii"\', check there \
-                        are no spaces in path'.format(
-                            data_directory, all_nii[data_directory][i], fsl_dir
-                        )
+                        f'Error in FSL bet command: \'{fsl_dir}/bin/bet \
+                        "{data_directory}/{all_nii[data_directory][i]}" "{data_directory}/tmp/tmp.nii"\'\
+                        , check there are no spaces in path'
                     )
                     exit(0)
             else:
                 os.system(
-                    "cp {0}/{1} {0}/tmp/tmp.nii".format(
-                        data_directory, all_nii[data_directory][i]
-                    )
+                    f"cp {data_directory}/{all_nii[data_directory][i]} {data_directory}/tmp/tmp.nii"
                 )
 
             flt = fsl.FLIRT(
@@ -202,34 +198,26 @@ def run_flirt(
                 uses_qform=True,
                 terminal_output="allatonce",
             )
-            flt.inputs.in_file = "{0}/tmp/tmp.nii".format(data_directory)
-            flt.inputs.reference = "{0}/tmp/ref.nii".format(cur_dir)
+            flt.inputs.in_file = f"{data_directory}/tmp/tmp.nii"
+            flt.inputs.reference = f"{cur_dir}/tmp/ref.nii"
             flt.inputs.output_type = "NIFTI_GZ"
-            flt.inputs.out_matrix_file = "{0}/tmp/tmp{1}.txt".format(
-                data_directory, i
-            )
-            flt.inputs.out_file = "{0}/tmp/reg{1}.nii.gz".format(
-                data_directory, i
-            )
+            flt.inputs.out_matrix_file = f"{data_directory}/tmp/tmp{i}.txt"
+            flt.inputs.out_file = f"{data_directory}/tmp/reg{i}.nii.gz"
             flt.inputs.searchr_x = [-90, 90]
             flt.inputs.searchr_y = [-90, 90]
             flt.inputs.searchr_z = [-90, 90]
             flt.inputs.interp = "trilinear"
             res = flt.run()
             if res.runtime.returncode != 0:
-                print("Error in FLIRT command: '{}'".format(flt.cmdline))
+                print(f"Error in FLIRT command: '{flt.cmdline}'")
                 exit(0)
 
             # This will use avscale to get real world co-ords
             # out of FLIRT
-            f = open("{0}/avs.txt".format(data_directory), "w")
+            f = open(f"{data_directory}/tmp/avs.txt", "w")
             avscale = fsl.AvScale(all_param=True, terminal_output="allatonce")
-            avscale.inputs.mat_file = "{0}/tmp/tmp{1}.txt".format(
-                data_directory, i
-            )
-            avscale.inputs.ref_file = "{0}/tmp/reg{1}.nii.gz".format(
-                data_directory, i
-            )
+            avscale.inputs.mat_file = f"{data_directory}/tmp/tmp{i}.txt"
+            avscale.inputs.ref_file = f"{data_directory}/tmp/reg{i}.nii.gz"
             res = avscale.run()
             if res.runtime.returncode != 0:
                 print("Error in AVScale command")
@@ -239,35 +227,27 @@ def run_flirt(
                 cost_func=cost_func,
                 terminal_output="allatonce",
             )
-            flt.inputs.in_file = "{0}/tmp/reg{1}.nii.gz".format(
-                data_directory, i
-            )
-            flt.inputs.reference = "{0}/tmp/ref.nii".format(cur_dir)
+            flt.inputs.in_file = f"{data_directory}/tmp/reg{i}.nii.gz"
+            flt.inputs.reference = f"{cur_dir}/tmp/ref.nii"
             flt.inputs.output_type = "NIFTI_GZ"
-            flt.inputs.schedule = "{0}/etc/flirtsch/measurecost1.sch".format(
-                fsl_dir
+            flt.inputs.schedule = f"{fsl_dir}/etc/flirtsch/measurecost1.sch"
+            flt.inputs.in_matrix_file = f"{data_directory}/tmp/tmp{i}.txt"
+            flt.inputs.out_matrix_file = (
+                f"{data_directory}/tmp/reg{i}_flirt.mat"
             )
-            flt.inputs.in_matrix_file = "{0}/tmp/tmp{1}.txt".format(
-                data_directory, i
-            )
-            flt.inputs.out_matrix_file = "{0}/tmp/reg{1}_flirt.mat".format(
-                data_directory, i
-            )
-            flt.inputs.out_file = "{0}/tmp/reg{1}.nii.gz".format(
-                data_directory, i
-            )
+            flt.inputs.out_file = f"{data_directory}/tmp/reg{i}.nii.gz"
             out_names.append(f"{data_directory}/tmp/reg{i}.nii.gz")
 
             res = flt.run()
             cost_str = str(res.runtime.stdout)
             cost_val = float(cost_str.split()[0])
             if res.runtime.returncode != 0:
-                print("Error in FLIRT command: '{}'".format(flt.cmdline))
+                print(f"Error in FLIRT command: '{flt.cmdline}'")
                 exit(0)
             try:
                 original_omats.append(omat.read_avs(avs_str, cost_val))
                 tmp_omat = omat.read_tmp_trans(
-                    "{0}/tmp/tmp{1}.txt".format(data_directory, i)
+                    f"{data_directory}/tmp/tmp{i}.txt"
                 )
                 original_omats[-1][0] = tmp_omat[0][3]
                 original_omats[-1][1] = tmp_omat[1][3]
@@ -275,9 +255,7 @@ def run_flirt(
                 omats.append(original_omats[-1])
             except IndexError:
                 logging.debug(
-                    "{0}/tmp/tmp{1}.txt does not contain omat data".format(
-                        data_directory, i
-                    )
+                    f"{data_directory}/tmp/tmp{i}.txt does not contain omat data"
                 )
 
             progress.printProgressBar(
@@ -310,7 +288,7 @@ def flirt_reg(
             level=logging.DEBUG,
             format="%(asctime)s - %(levelname)s - %(message)s",
         )
-        logging.debug("Verbosity: {}".format(verbose))
+        logging.debug(f"Verbosity: {verbose}")
 
     data_dirs = []
     if dname:
@@ -321,9 +299,9 @@ def flirt_reg(
 
     # Check input files and get the baseline file to register against
     if fname:
-        logging.debug("Checking file {}".format(fname))
+        logging.debug(f"Checking file {fname}")
         if os.path.isfile(os.path.abspath(fname)):
-            logging.debug("Opening file {}".format(fname))
+            logging.debug(f"Opening file {fname}")
             cur_dir = os.path.dirname(os.path.abspath(fname))
             all_nii = {}
             n_nii = 0
@@ -331,12 +309,7 @@ def flirt_reg(
                 all_nii[data_directory] = get_nii(data_directory, max_images)
                 n_nii += len(all_nii[data_directory])
         else:
-            logging.debug(
-                "!!! {} is not a file. !!!\
-                            \nExiting...".format(
-                    fname
-                )
-            )
+            logging.debug(f"!!! {fname} is not a file. !!!\nExiting...")
             raise FileNotFoundError(
                 errno.ENOENT, os.strerror(errno.ENOENT), fname
             )
@@ -358,17 +331,15 @@ def flirt_reg(
     else:
         fsl_dir = "/usr/share/fsl"
 
-    logging.debug("FSL Base Dir: {}".format(fsl_dir))
+    logging.debug(f"FSL Base Dir: {fsl_dir}")
 
-    if not os.path.exists("{0}/tmp".format(cur_dir)):
-        os.mkdir("{0}/tmp".format(cur_dir))
+    if not os.path.exists(f"{cur_dir}/tmp"):
+        os.mkdir(f"{cur_dir}/tmp")
     # Brain extract the reference image
     if extraction:
-        os.system(
-            "{}/bin/bet {} {}/tmp/ref.nii".format(fsl_dir, fname, cur_dir)
-        )
+        os.system(f"{fsl_dir}/bin/bet {fname} {cur_dir}/tmp/ref.nii")
     else:
-        os.system("cp {} {}/tmp/ref.nii".format(fname, cur_dir))
+        os.system(f"cp {fname} {cur_dir}/tmp/ref.nii")
 
     omats, original_omats, out_paths = run_flirt(
         all_nii,
@@ -384,15 +355,15 @@ def flirt_reg(
 
     if oname:
         # Save to specified filename
-        logging.debug("Saving to {}".format(oname))
+        logging.debug(f"Saving to {oname}")
         omat.reg_to_csv(omats, os.path.join(data_dirs[0], oname))
         omat.avs_to_csv(
             original_omats,
-            os.path.join(data_dirs[0], "original_{}".format(oname)),
+            os.path.join(data_dirs[0], f"original_{oname}"),
         )
     else:
         # Save to out.nii
-        logging.debug("Saving to {}".format("out.csv"))
+        logging.debug("Saving to out.csv")
         if not os.path.exists(f"{data_dirs[0]}/results"):
             os.mkdir(f"{data_dirs[0]}/results")
         omat.reg_to_csv(
@@ -423,7 +394,7 @@ def apply_transform(
             level=logging.DEBUG,
             format="%(asctime)s - %(levelname)s - %(message)s",
         )
-        logging.debug("Verbosity: {}".format(verbose))
+        logging.debug(f"Verbosity: {verbose}")
     data_dirs = []
     if dname:
         for directory in dname:
@@ -441,7 +412,7 @@ def apply_transform(
     first_file = f"{input_schema[0]}0000{input_schema[1]}"
     logging.debug(f"Checking file {first_file}")
     if os.path.isfile(os.path.abspath(first_file)):
-        logging.debug("Opening file {}".format(first_file))
+        logging.debug(f"Opening file {first_file}")
         cur_dir = os.path.dirname(os.path.abspath(first_file))
         all_nii = {}
         n_nii = 0
@@ -450,12 +421,7 @@ def apply_transform(
             n_nii += len(all_nii[data_directory])
             all_inputs = get_inputs(n_nii, input_schema)
     else:
-        logging.debug(
-            "!!! {} is not a file. !!!\
-                    \nExiting...".format(
-                first_file
-            )
-        )
+        logging.debug(f"!!! {first_file} is not a file. !!!\nExiting...")
         raise FileNotFoundError(
             errno.ENOENT, os.strerror(errno.ENOENT), first_file
         )
@@ -474,12 +440,12 @@ def apply_transform(
     else:
         fsl_dir = "/usr/share/fsl"
 
-    logging.debug("FSL Base Dir: {}".format(fsl_dir))
+    logging.debug(f"FSL Base Dir: {fsl_dir}")
 
     for data_directory in all_nii:
         dir_len = len(all_nii[data_directory])
 
-        print("Applying FLIRT Transform on {}".format(data_directory))
+        print(f"Applying FLIRT Transform on {data_directory}")
         if cur_dir == data_directory:
             start_idx = 1
         else:
@@ -493,33 +459,29 @@ def apply_transform(
             length=50,
         )
 
-        if not os.path.exists("{0}/tmp".format(data_directory)):
-            os.mkdir("{0}/tmp".format(data_directory))
-        if not os.path.exists("{0}/FLIRT_out".format(data_directory)):
-            os.mkdir("{0}/FLIRT_out".format(data_directory))
+        if not os.path.exists(f"{data_directory}/tmp"):
+            os.mkdir(f"{data_directory}/tmp")
+        if not os.path.exists(f"{data_directory}/FLIRT_out"):
+            os.mkdir(f"{data_directory}/FLIRT_out")
         for i in range(start_idx, dir_len):
             make_coords(data_directory, all_inputs, all_nii, fsl_dir, i)
             # apply the transform
             flt = fsl.FLIRT(apply_xfm=True, terminal_output="allatonce")
-            flt.inputs.in_file = "{0}/{1}".format(
-                data_directory, all_nii[data_directory][i]
+            flt.inputs.in_file = (
+                f"{data_directory}/{all_nii[data_directory][i]}"
             )
-            flt.inputs.reference = "{0}/{1}".format(
-                data_directory, all_nii[data_directory][0]
+            flt.inputs.reference = (
+                f"{data_directory}/{all_nii[data_directory][0]}"
             )
             flt.inputs.output_type = "NIFTI_GZ"
-            flt.inputs.schedule = "{0}/etc/flirtsch/measurecost1.sch".format(
-                fsl_dir
+            flt.inputs.schedule = f"{fsl_dir}/etc/flirtsch/measurecost1.sch"
+            flt.inputs.in_matrix_file = (
+                f"{data_directory}/tmp/trans_tmp{i}.txt"
             )
-            flt.inputs.in_matrix_file = "{0}/tmp/trans_tmp{1}.txt".format(
-                data_directory, i
-            )
-            flt.inputs.out_file = "{0}/FLIRT_out/out_{1}.nii.gz".format(
-                data_directory, i
-            )
+            flt.inputs.out_file = f"{data_directory}/FLIRT_out/out_{i}.nii.gz"
             res = flt.run()
             if res.runtime.returncode != 0:
-                print("Error in FLIRT command: '{}'".format(flt.cmdline))
+                print(f"Error in FLIRT command: '{flt.cmdline}'")
                 exit(0)
             progress.printProgressBar(
                 i + 1,
