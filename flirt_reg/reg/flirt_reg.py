@@ -16,7 +16,6 @@ from flirt_reg.reg import omat
 from flirt_reg.utils import progress, figstring
 
 
-
 def is_nii(path):
     """
     Checks if a file is a .nii
@@ -209,7 +208,9 @@ def run_flirt(
             flt.inputs.out_matrix_file = "{0}/tmp/tmp{1}.txt".format(
                 data_directory, i
             )
-            flt.inputs.out_file = "{0}/tmp/reg{1}.nii.gz".format(data_directory, i)
+            flt.inputs.out_file = "{0}/tmp/reg{1}.nii.gz".format(
+                data_directory, i
+            )
             flt.inputs.searchr_x = [-90, 90]
             flt.inputs.searchr_y = [-90, 90]
             flt.inputs.searchr_z = [-90, 90]
@@ -238,7 +239,9 @@ def run_flirt(
                 cost_func=cost_func,
                 terminal_output="allatonce",
             )
-            flt.inputs.in_file = "{0}/tmp/reg{1}.nii.gz".format(data_directory, i)
+            flt.inputs.in_file = "{0}/tmp/reg{1}.nii.gz".format(
+                data_directory, i
+            )
             flt.inputs.reference = "{0}/tmp/ref.nii".format(cur_dir)
             flt.inputs.output_type = "NIFTI_GZ"
             flt.inputs.schedule = "{0}/etc/flirtsch/measurecost1.sch".format(
@@ -250,7 +253,9 @@ def run_flirt(
             flt.inputs.out_matrix_file = "{0}/tmp/reg{1}_flirt.mat".format(
                 data_directory, i
             )
-            flt.inputs.out_file = "{0}/tmp/reg{1}.nii.gz".format(data_directory, i)
+            flt.inputs.out_file = "{0}/tmp/reg{1}.nii.gz".format(
+                data_directory, i
+            )
             out_names.append(f"{data_directory}/tmp/reg{i}.nii.gz")
 
             res = flt.run()
@@ -355,9 +360,13 @@ def flirt_reg(
 
     logging.debug("FSL Base Dir: {}".format(fsl_dir))
 
+    if not os.path.exists("{0}/tmp".format(cur_dir)):
+        os.mkdir("{0}/tmp".format(cur_dir))
     # Brain extract the reference image
     if extraction:
-        os.system("{}/bin/bet {} {}/tmp/ref.nii".format(fsl_dir, fname, cur_dir))
+        os.system(
+            "{}/bin/bet {} {}/tmp/ref.nii".format(fsl_dir, fname, cur_dir)
+        )
     else:
         os.system("cp {} {}/tmp/ref.nii".format(fname, cur_dir))
 
@@ -386,11 +395,18 @@ def flirt_reg(
         logging.debug("Saving to {}".format("out.csv"))
         if not os.path.exists(f"{data_dirs[0]}/results"):
             os.mkdir(f"{data_dirs[0]}/results")
-        omat.reg_to_csv(omats, os.path.join(os.path.join(data_dirs[0], "results"), "out.csv"))
+        omat.reg_to_csv(
+            omats,
+            os.path.join(os.path.join(data_dirs[0], "results"), "out.csv"),
+        )
         omat.avs_to_csv(
-            original_omats, os.path.join(os.path.join(data_dirs[0], "results"), "original_out.csv"))
+            original_omats,
+            os.path.join(
+                os.path.join(data_dirs[0], "results"), "original_out.csv"
+            ),
+        )
 
-    make_gif(out_paths,data_dirs[0])
+    make_gif(out_paths, data_dirs[0])
 
     return omats
 
@@ -560,6 +576,7 @@ def apply_transform_cmd():
         total_time = time.gmtime((time.time() - start_time))
         print(f"Pipeline complete in {time.strftime('%Hh%Mm%Ss', total_time)}")
 
+
 def get_gif_slices(image):
     """Gets 3 orthogonal slices that show how good the registration is
 
@@ -582,13 +599,13 @@ def get_gif_slices(image):
     ]
     return slices
 
+
 def make_gif(img_paths, out_path):
 
     slices = []
     for path in img_paths:
         img = nb.load(path)
         slices.append(get_gif_slices(img))
-
 
     start_time = time.time()
     if not os.path.exists(out_path + os.sep + "figures"):
