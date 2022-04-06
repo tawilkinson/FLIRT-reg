@@ -1,0 +1,3 @@
+# flirt_reg/reg/flirt_reg.py: 1
+# flirt_reg/reg/omat.py: 4
+cupy_cuda114 == 9.4.0
