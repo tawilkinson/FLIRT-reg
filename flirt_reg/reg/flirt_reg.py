@@ -177,6 +177,7 @@ def run_flirt(
                 btr.inputs.in_file = (
                     f"{data_directory}/{all_nii[data_directory][i]}"
                 )
+                btr.inputs.output_type = "NIFTI"
                 btr.inputs.out_file = f"{data_directory}/tmp/tmp.nii"
                 res = btr.run()
                 if res.runtime.returncode != 0:
@@ -337,7 +338,18 @@ def flirt_reg(
         os.mkdir(f"{cur_dir}/tmp")
     # Brain extract the reference image
     if extraction:
-        os.system(f"{fsl_dir}/bin/bet {fname} {cur_dir}/tmp/ref.nii")
+        btr = fsl.BET()
+        btr.inputs.in_file = fname
+        btr.inputs.output_type = "NIFTI"
+        btr.inputs.out_file = f"{cur_dir}/tmp/ref.nii"
+        res = btr.run()
+        if res.runtime.returncode != 0:
+            print(
+                f'Error in FSL bet command: \'{fsl_dir}/bin/bet \
+                "{data_directory}/{all_nii[data_directory][i]}" "{data_directory}/tmp/ref.nii"\'\
+                , check there are no spaces in path'
+            )
+            exit(0)
     else:
         os.system(f"cp {fname} {cur_dir}/tmp/ref.nii")
 
