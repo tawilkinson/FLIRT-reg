@@ -8,7 +8,7 @@ setup(
         "flirt_reg.utils",
         "gpuoptional",
     ],
-    version="0.9",
+    version="0.9.1",
     description="A python wrapper for FLIRT MRI registration",
     author="Dr Tom Wilkinson",
     author_email="tom@tawilkinson.com",

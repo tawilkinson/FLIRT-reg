@@ -27,12 +27,12 @@ def main():
     parser.add_argument(
         "-n",
         "--num",
-        help="number of images. Default: All images in \
+        help="number of images to process. Default: All images in \
                     directory.",
         type=int,
     )
     parser.add_argument(
-        "-o", "--output", help="output filename. Default: out.nii."
+        "-o", "--output", help="output filename. Default: out.csv."
     )
     parser.add_argument(
         "-v",
@@ -48,8 +48,8 @@ def main():
     )
     parser.add_argument(
         "-b",
-        "--no-brain-extract",
-        action="store_false",
+        "--brain-extract",
+        action="store_true",
         help="Turn off brain extraction. Default: false.",
     )
     parser.add_argument(
@@ -90,7 +90,7 @@ def main():
         max_images=args.num,
         dname=args.dirname,
         rads=args.radians,
-        extraction=args.no_brain_extract,
+        extraction=args.brain_extract,
         cost_func=cost_func,
     )
 
