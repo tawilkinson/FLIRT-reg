@@ -346,7 +346,7 @@ def flirt_reg(
         if res.runtime.returncode != 0:
             print(
                 f'Error in FSL bet command: \'{fsl_dir}/bin/bet \
-                "{data_directory}/{all_nii[data_directory][i]}" "{data_directory}/tmp/ref.nii"\'\
+                "{fname}" "{cur_dir}/tmp/ref.nii"\'\
                 , check there are no spaces in path'
             )
             exit(0)
