@@ -11,4 +11,4 @@ nipype == 1.7.1
 numpy == 1.22.0
 
 # flirt-reg/setup.py: 1
-setuptools == 65.5.1
+setuptools == 70.0.0
